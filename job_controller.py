@@ -4,6 +4,8 @@ Triggers Gumloop workflows and tracks job state.
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, Dict, Any
 import uuid
@@ -15,6 +17,23 @@ from status_store import StatusStore
 
 app = FastAPI(title="AutoClipper API")
 status_store = StatusStore()
+
+# Allow the frontend to call the API in hackathon/dev setups.
+# In production, restrict origins.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve the lightweight dashboard UI (static) from /.
+app.mount(
+    "/",
+    StaticFiles(directory="api/static", html=True),
+    name="static",
+)
 
 
 class CreateJobRequest(BaseModel):
