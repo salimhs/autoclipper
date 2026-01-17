@@ -12,7 +12,7 @@ import uuid
 import requests
 from datetime import datetime
 
-from status_store import StatusStore
+from .status_store import StatusStore
 
 
 app = FastAPI(title="AutoClipper API")
