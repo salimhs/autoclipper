@@ -7,3 +7,4 @@ mediapipe==0.10.9
 opencv-python==4.9.0.80
 requests==2.31.0
 yt-dlp==2024.1.1
+jsonschema==4.20.0

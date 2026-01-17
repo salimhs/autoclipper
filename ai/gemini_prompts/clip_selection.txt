@@ -11,21 +11,27 @@ Rules:
 - Output ONLY valid JSON
 - Do NOT include explanations
 - Do NOT hallucinate timestamps
-- All timestamps MUST be within duration
-- Clips MUST be self-contained
-- Prefer strong hooks in first 3 seconds
+- All timestamps MUST be within duration (0 to duration_sec)
+- Clips MUST be self-contained (complete thoughts, not mid-sentence)
+- Clips MUST be 15-90 seconds long
+- Clips MUST NOT overlap in time
+- Prefer strong hooks in first 2-3 seconds (questions, surprising statements, emotional moments)
+- Each clip must have a clear narrative arc (beginning, middle, end)
+- Maximum 10 clips total
 
 Output schema:
 {
   "clips": [
     {
-      "clip_id": "string",
+      "clip_id": "string (unique ID)",
       "start_sec": number,
       "end_sec": number,
-      "title": "string",
-      "hook_text": "string",
-      "score": number,
-      "reason": "string"
+      "title": "string (catchy, descriptive)",
+      "hook_text": "string (the compelling hook in first 3 seconds)",
+      "score": number (0.0-1.0, virality score),
+      "reason": "string (why this clip has viral potential)"
     }
   ]
 }
+
+CRITICAL: Ensure clips are sorted by score (descending) and do NOT overlap.

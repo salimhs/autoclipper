@@ -69,33 +69,36 @@ def extract_subtitles(transcript: dict, start_sec: float, end_sec: float) -> lis
     return subtitles
 
 
-def extract_crop_path(tracking: dict, start_sec: float, end_sec: float) -> list:
-    """Extract crop path keyframes for clip timerange."""
+def extract_crop_path(crop_paths_data: dict, start_sec: float, end_sec: float) -> list:
+    """
+    Extract crop path keyframes for clip timerange.
+    
+    Now expects crop_paths_data to be {"crop_path": [{t, x, y, w, h}, ...]}
+    NOT tracking data with detections.
+    """
     crop_path = []
     
-    for frame in tracking.get("frames", []):
-        t = frame["timestamp"]
+    # crop_paths_data should have structure: {"crop_path": [...]}
+    global_crop_path = crop_paths_data.get("crop_path", [])
+    
+    for keyframe in global_crop_path:
+        t = keyframe["t"]
         
         if start_sec <= t <= end_sec:
-            # Find crop path entry (assuming tracking has crop_path field)
-            # Or compute from detections
-            if frame.get("detections"):
-                det = frame["detections"][0]
-                bbox = det["bbox"]
-                
-                crop_path.append({
-                    "t": t - start_sec,
-                    "x": bbox["x"],
-                    "y": bbox["y"],
-                    "w": bbox["w"],
-                    "h": bbox["h"]
-                })
+            # Convert to clip-relative time
+            crop_path.append({
+                "t": t - start_sec,
+                "x": keyframe["x"],
+                "y": keyframe["y"],
+                "w": keyframe["w"],
+                "h": keyframe["h"]
+            })
     
-    # Fallback: center crop
+    # Fallback: center crop if no keyframes in range
     if not crop_path:
         crop_path = [{
             "t": 0.0,
-            "x": 420,  # Assuming 1920x1080, crop to 1080x1920
+            "x": 420,  # Assuming 1920x1080 source, crop to 1080x1920 (9:16)
             "y": 0,
             "w": 1080,
             "h": 1920

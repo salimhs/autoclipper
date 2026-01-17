@@ -118,27 +118,94 @@ class VisualTracker:
         return self._smooth_crop_path(crop_path)
     
     def _smooth_crop_path(self, crop_path: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Apply smoothing to crop path to avoid jarring movements."""
-        if len(crop_path) < 3:
+        """
+        Apply One Euro filter to crop path for smooth, responsive tracking.
+        Better than moving average: reduces jitter while maintaining responsiveness.
+        """
+        if len(crop_path) < 2:
             return crop_path
         
-        # Simple moving average
-        smoothed = [crop_path[0]]
-        window = 3
+        # One Euro filter for x-coordinate
+        filter_x = OneEuroFilter(min_cutoff=1.0, beta=0.007)
         
-        for i in range(1, len(crop_path) - 1):
-            start = max(0, i - window // 2)
-            end = min(len(crop_path), i + window // 2 + 1)
+        smoothed = []
+        for i, keyframe in enumerate(crop_path):
+            t = keyframe["t"]
             
-            avg_x = sum(cp["x"] for cp in crop_path[start:end]) // (end - start)
+            # Apply  filter to x coordinate (y is usually fixed at 0 for horizontal videos)
+            smoothed_x = filter_x(keyframe["x"], t)
             
             smoothed.append({
-                "t": crop_path[i]["t"],
-                "x": avg_x,
-                "y": crop_path[i]["y"],
-                "w": crop_path[i]["w"],
-                "h": crop_path[i]["h"]
+                "t": t,
+                "x": int(smoothed_x),
+                "y": keyframe["y"],
+                "w": keyframe["w"],
+                "h": keyframe["h"]
             })
         
-        smoothed.append(crop_path[-1])
         return smoothed
+
+
+class OneEuroFilter:
+    """
+    One Euro Filter for smooth, low-latency filtering.
+    Reference: http://cristal.univ-lille.fr/~casiez/1euro/
+    
+    Reduces jitter while maintaining responsiveness to rapid changes.
+    """
+    
+    def __init__(self, min_cutoff: float = 1.0, beta: float = 0.007, d_cutoff: float = 1.0):
+        """
+        Args:
+            min_cutoff: Minimum cutoff frequency (lower = more smoothing)
+            beta: Speed coefficient (higher = more responsive to rapid changes)
+            d_cutoff: Cutoff frequency for derivative
+        """
+        self.min_cutoff = min_cutoff
+        self.beta = beta
+        self.d_cutoff = d_cutoff
+        self.x_prev = None
+        self.dx_prev = 0.0
+        self.t_prev = None
+    
+    def __call__(self, x: float, t: float) -> float:
+        """Filter a new value."""
+        if self.x_prev is None:
+            self.x_prev = x
+            self.t_prev = t
+            return x
+        
+        # Calculate time delta
+        dt = t - self.t_prev
+        if dt <= 0:
+            dt = 0.001  # Avoid division by zero
+        
+        # Estimate derivative
+        dx = (x - self.x_prev) / dt
+        
+        # Smooth derivative
+        edx = self._smoothing_factor(dt, self.d_cutoff)
+        dx_hat = self._exponential_smoothing(edx, dx, self.dx_prev)
+        
+        # Calculate adaptive cutoff
+        cutoff = self.min_cutoff + self.beta * abs(dx_hat)
+        
+        # Smooth value
+        alpha = self._smoothing_factor(dt, cutoff)
+        x_hat = self._exponential_smoothing(alpha, x, self.x_prev)
+        
+        # Store state
+        self.x_prev = x_hat
+        self.dx_prev = dx_hat
+        self.t_prev = t
+        
+        return x_hat
+    
+    def _smoothing_factor(self, dt: float, cutoff: float) -> float:
+        """Calculate smoothing factor (alpha) from cutoff frequency."""
+        r = 2 * 3.14159 * cutoff * dt
+        return r / (r + 1)
+    
+    def _exponential_smoothing(self, alpha: float, x: float, x_prev: float) -> float:
+        """Apply exponential smoothing."""
+        return alpha * x + (1 - alpha) * x_prev

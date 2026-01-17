@@ -1,13 +1,14 @@
 {
     "workflow_name": "AutoClipper Video Processing",
-    "description": "Convert long-form video to ranked vertical clips",
+    "description": "Convert long-form video to ranked vertical clips with Gumloop LLM (Gemini fallback)",
     "nodes": [
         {
             "node_id": "node_1",
             "name": "URL Validation",
             "type": "custom_code",
             "input_schema": {
-                "video_url": "string"
+                "video_url": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "video_url": "string",
@@ -24,7 +25,8 @@
                 "node_1"
             ],
             "input_schema": {
-                "video_url": "string"
+                "video_url": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "video_uri": "string",
@@ -51,7 +53,10 @@
                 "node_3b"
             ],
             "input_schema": {
-                "audio_uri": "string"
+                "audio_uri": "string",
+                "video_url": "string",
+                "duration_sec": "number",
+                "job_id": "string"
             },
             "output_schema": {
                 "transcript_uri": "string",
@@ -72,7 +77,11 @@
                 "node_3a"
             ],
             "input_schema": {
-                "video_uri": "string"
+                "video_uri": "string",
+                "video_url": "string",
+                "width": "integer",
+                "height": "integer",
+                "job_id": "string"
             },
             "output_schema": {
                 "tracking_uri": "string",
@@ -82,23 +91,91 @@
             "requires_gpu": true
         },
         {
-            "node_id": "node_4",
-            "name": "Gemini Clip Selection",
+            "node_id": "node_3c",
+            "name": "Model Router",
             "type": "custom_code",
             "depends_on": [
                 "node_3a"
             ],
             "input_schema": {
                 "transcript_uri": "string",
-                "duration_sec": "number"
+                "duration_sec": "number",
+                "job_id": "string"
+            },
+            "output_schema": {
+                "strategy": "string",
+                "reason": "string",
+                "selected_model_name": "string"
+            },
+            "script": "model_router.py"
+        },
+        {
+            "node_id": "node_4",
+            "name": "LLM Clip Selection",
+            "type": "gumloop_llm",
+            "depends_on": [
+                "node_3c"
+            ],
+            "input_schema": {
+                "transcript_uri": "string",
+                "duration_sec": "number",
+                "strategy": "string",
+                "job_id": "string"
+            },
+            "output_schema": {
+                "raw_edl_json": "string"
+            },
+            "config": {
+                "model": "best_reasoning",
+                "temperature": 0.3,
+                "response_format": "json",
+                "fallback_to_custom": true,
+                "custom_script": "llm_select_clips.py"
+            },
+            "system_prompt": "You are an expert video editor. Analyze transcripts and identify viral short-form clip candidates.",
+            "prompt_template": "See schemas/edl.json for required output format. Transcript and duration will be loaded from URIs."
+        },
+        {
+            "node_id": "node_4b",
+            "name": "Validate EDL Schema",
+            "type": "custom_code",
+            "depends_on": [
+                "node_4"
+            ],
+            "input_schema": {
+                "raw_edl_json": "string",
+                "duration_sec": "number",
+                "transcript_uri": "string",
+                "job_id": "string"
+            },
+            "output_schema": {
+                "valid": "boolean",
+                "edl_uri": "string",
+                "validation_error": "string"
+            },
+            "script": "json_validate_edl.py"
+        },
+        {
+            "node_id": "node_4c",
+            "name": "Repair EDL",
+            "type": "custom_code",
+            "depends_on": [
+                "node_4b"
+            ],
+            "conditional": "{{node_4b.valid}} == false",
+            "input_schema": {
+                "raw_edl_json": "string",
+                "validation_error": "string",
+                "duration_sec": "number",
+                "strategy": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "edl_uri": "string"
             },
-            "script": "gemini_select_clips.py",
+            "script": "json_repair_edl.py",
             "config": {
-                "model": "gemini-1.5-pro-latest",
-                "temperature": 0.3
+                "max_retries": 2
             }
         },
         {
@@ -108,13 +185,15 @@
             "depends_on": [
                 "node_3a",
                 "node_3b",
-                "node_4"
+                "node_4b",
+                "node_4c"
             ],
             "input_schema": {
                 "edl_uri": "string",
                 "word_timeline_uri": "string",
                 "crop_paths_uri": "string",
-                "video_uri": "string"
+                "video_uri": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "render_recipe_uri": "string"
@@ -129,7 +208,8 @@
                 "node_5"
             ],
             "input_schema": {
-                "render_recipe_uri": "string"
+                "render_recipe_uri": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "render_batch_id": "string"
@@ -145,7 +225,8 @@
                 "node_6"
             ],
             "input_schema": {
-                "render_batch_id": "string"
+                "render_batch_id": "string",
+                "job_id": "string"
             },
             "output_schema": {
                 "clips": [
@@ -162,9 +243,14 @@
         }
     ],
     "error_handling": {
-        "node_4_json_invalid": {
-            "action": "retry_with_repair_prompt",
+        "node_4b_validation_failed": {
+            "action": "branch_to_repair",
+            "target_node": "node_4c",
             "max_retries": 2
+        },
+        "node_4c_repair_failed": {
+            "action": "fail_with_reason",
+            "reason": "Could not generate valid EDL after repair attempts"
         },
         "node_3b_no_face": {
             "action": "use_center_crop_fallback"
@@ -172,11 +258,39 @@
         "node_4_no_clips": {
             "action": "fail_with_reason",
             "reason": "No viable clips found in transcript"
+        },
+        "any_node_transient_error": {
+            "action": "retry_with_exponential_backoff",
+            "max_retries": 3,
+            "base_delay_sec": 1,
+            "max_delay_sec": 30
+        }
+    },
+    "cleanup": {
+        "on_success": {
+            "action": "cleanup_temp_files",
+            "keep_outputs": [
+                "clips",
+                "edl_uri",
+                "render_recipe_uri"
+            ]
+        },
+        "on_failure": {
+            "action": "cleanup_temp_files",
+            "keep_outputs": [
+                "logs",
+                "error_details"
+            ]
         }
     },
     "outputs": {
         "job_id": "{{workflow.job_id}}",
         "status": "completed",
-        "clips": "{{node_7.clips}}"
+        "clips": "{{node_7.clips}}",
+        "edl_uri": "{{node_4b.edl_uri || node_4c.edl_uri}}",
+        "metadata": {
+            "strategy_used": "{{node_3c.strategy}}",
+            "model_used": "{{node_3c.selected_model_name}}"
+        }
     }
 }
