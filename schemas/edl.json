@@ -1,0 +1,57 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "clips"
+    ],
+    "properties": {
+        "clips": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "clip_id",
+                    "start_sec",
+                    "end_sec",
+                    "title",
+                    "hook_text",
+                    "score"
+                ],
+                "properties": {
+                    "clip_id": {
+                        "type": "string",
+                        "description": "Unique identifier for the clip"
+                    },
+                    "start_sec": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Clip start time in seconds"
+                    },
+                    "end_sec": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "Clip end time in seconds"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Descriptive title for the clip"
+                    },
+                    "hook_text": {
+                        "type": "string",
+                        "description": "The compelling hook in the first 3 seconds"
+                    },
+                    "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Virality score (0.0 to 1.0)"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this clip was selected"
+                    }
+                }
+            }
+        }
+    }
+}

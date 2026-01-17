@@ -1,0 +1,102 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "video_uri",
+        "clips"
+    ],
+    "properties": {
+        "video_uri": {
+            "type": "string",
+            "description": "Storage URI of the source video"
+        },
+        "clips": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "clip_id",
+                    "start_sec",
+                    "end_sec",
+                    "crop_path",
+                    "subtitles"
+                ],
+                "properties": {
+                    "clip_id": {
+                        "type": "string"
+                    },
+                    "start_sec": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "end_sec": {
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "crop_path": {
+                        "type": "array",
+                        "description": "Time-based crop keyframes for smooth panning",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "t",
+                                "x",
+                                "y",
+                                "w",
+                                "h"
+                            ],
+                            "properties": {
+                                "t": {
+                                    "type": "number",
+                                    "description": "Time in seconds relative to clip start"
+                                },
+                                "x": {
+                                    "type": "integer",
+                                    "description": "X coordinate of crop origin"
+                                },
+                                "y": {
+                                    "type": "integer",
+                                    "description": "Y coordinate of crop origin"
+                                },
+                                "w": {
+                                    "type": "integer",
+                                    "description": "Crop width in pixels"
+                                },
+                                "h": {
+                                    "type": "integer",
+                                    "description": "Crop height in pixels"
+                                }
+                            }
+                        }
+                    },
+                    "subtitles": {
+                        "type": "array",
+                        "description": "Word-level subtitles for burning in",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "start",
+                                "end",
+                                "text"
+                            ],
+                            "properties": {
+                                "start": {
+                                    "type": "number",
+                                    "description": "Subtitle start time in seconds relative to clip"
+                                },
+                                "end": {
+                                    "type": "number",
+                                    "description": "Subtitle end time in seconds"
+                                },
+                                "text": {
+                                    "type": "string",
+                                    "description": "Text to display"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

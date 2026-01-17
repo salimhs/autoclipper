@@ -1,0 +1,182 @@
+{
+    "workflow_name": "AutoClipper Video Processing",
+    "description": "Convert long-form video to ranked vertical clips",
+    "nodes": [
+        {
+            "node_id": "node_1",
+            "name": "URL Validation",
+            "type": "custom_code",
+            "input_schema": {
+                "video_url": "string"
+            },
+            "output_schema": {
+                "video_url": "string",
+                "valid": "boolean",
+                "platform": "string"
+            },
+            "script": "validate_url.py"
+        },
+        {
+            "node_id": "node_2",
+            "name": "Download + Audio Extract",
+            "type": "custom_code",
+            "depends_on": [
+                "node_1"
+            ],
+            "input_schema": {
+                "video_url": "string"
+            },
+            "output_schema": {
+                "video_uri": "string",
+                "audio_uri": "string",
+                "duration_sec": "number",
+                "fps": "number",
+                "width": "integer",
+                "height": "integer"
+            },
+            "script": "download_extract.py",
+            "tools": [
+                "yt-dlp",
+                "ffmpeg"
+            ]
+        },
+        {
+            "node_id": "node_3a",
+            "name": "WhisperX Transcription",
+            "type": "custom_code",
+            "depends_on": [
+                "node_2"
+            ],
+            "parallel_with": [
+                "node_3b"
+            ],
+            "input_schema": {
+                "audio_uri": "string"
+            },
+            "output_schema": {
+                "transcript_uri": "string",
+                "word_timeline_uri": "string",
+                "confidence_stats": "object"
+            },
+            "script": "whisperx_transcribe.py",
+            "requires_gpu": true
+        },
+        {
+            "node_id": "node_3b",
+            "name": "Visual Tracking",
+            "type": "custom_code",
+            "depends_on": [
+                "node_2"
+            ],
+            "parallel_with": [
+                "node_3a"
+            ],
+            "input_schema": {
+                "video_uri": "string"
+            },
+            "output_schema": {
+                "tracking_uri": "string",
+                "crop_paths_uri": "string"
+            },
+            "script": "visual_tracking.py",
+            "requires_gpu": true
+        },
+        {
+            "node_id": "node_4",
+            "name": "Gemini Clip Selection",
+            "type": "custom_code",
+            "depends_on": [
+                "node_3a"
+            ],
+            "input_schema": {
+                "transcript_uri": "string",
+                "duration_sec": "number"
+            },
+            "output_schema": {
+                "edl_uri": "string"
+            },
+            "script": "gemini_select_clips.py",
+            "config": {
+                "model": "gemini-1.5-pro-latest",
+                "temperature": 0.3
+            }
+        },
+        {
+            "node_id": "node_5",
+            "name": "Merge Render Recipes",
+            "type": "custom_code",
+            "depends_on": [
+                "node_3a",
+                "node_3b",
+                "node_4"
+            ],
+            "input_schema": {
+                "edl_uri": "string",
+                "word_timeline_uri": "string",
+                "crop_paths_uri": "string",
+                "video_uri": "string"
+            },
+            "output_schema": {
+                "render_recipe_uri": "string"
+            },
+            "script": "merge_render_recipe.py"
+        },
+        {
+            "node_id": "node_6",
+            "name": "Dispatch GPU Render",
+            "type": "webhook",
+            "depends_on": [
+                "node_5"
+            ],
+            "input_schema": {
+                "render_recipe_uri": "string"
+            },
+            "output_schema": {
+                "render_batch_id": "string"
+            },
+            "webhook_url": "{RENDER_WORKER_URL}/render",
+            "method": "POST"
+        },
+        {
+            "node_id": "node_7",
+            "name": "Collect Results",
+            "type": "webhook_poll",
+            "depends_on": [
+                "node_6"
+            ],
+            "input_schema": {
+                "render_batch_id": "string"
+            },
+            "output_schema": {
+                "clips": [
+                    {
+                        "clip_id": "string",
+                        "mp4_url": "string",
+                        "score": "number"
+                    }
+                ]
+            },
+            "poll_url": "{RENDER_WORKER_URL}/status/{render_batch_id}",
+            "poll_interval_sec": 5,
+            "timeout_sec": 600
+        }
+    ],
+    "error_handling": {
+        "node_4_json_invalid": {
+            "action": "retry_with_repair_prompt",
+            "max_retries": 2
+        },
+        "node_3b_no_face": {
+            "action": "use_center_crop_fallback"
+        },
+        "node_4_no_clips": {
+            "action": "fail_with_reason",
+            "reason": "No viable clips found in transcript"
+        }
+    },
+    "outputs": {
+        "job_id": "{{workflow.job_id}}",
+        "status": "completed",
+        "clips": "{{node_7.clips}}"
+    }
+}
