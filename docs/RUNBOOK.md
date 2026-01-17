@@ -27,6 +27,55 @@ GUMLOOP_API_KEY=your_gumloop_key
 RENDER_WORKER_URL=http://localhost:8000
 ```
 
+## Quick Start (CLI)
+
+The easiest way to use AutoClipper is via the command-line tool:
+
+### Process a Video
+```bash
+python clipper.py --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+This will:
+1. Submit the job to the API
+2. Wait for processing to complete
+3. Save clips to `outputs/` directory
+
+### List All Jobs
+```bash
+python clipper.py --list
+```
+
+### View Job Details
+```bash
+python clipper.py --job-id abc123
+```
+
+### Clean Up Old Jobs
+```bash
+# Remove jobs older than 30 days
+python clipper.py --cleanup 30
+```
+
+## Output Structure
+
+Generated clips are automatically saved to `outputs/`:
+
+```
+outputs/
+└── 20260117_145800_youtube.com_watch_abc123ef/
+    ├── clip_001.mp4          # Generated clips
+    ├── clip_002.mp4
+    ├── clip_003.mp4
+    ├── manifest.json         # Job metadata
+    └── README.md             # Human-readable summary
+```
+
+Each job folder contains:
+- **MP4 files**: The actual video clips
+- **manifest.json**: Metadata (scores, sizes, timestamps)
+- **README.md**: Quick reference for the job
+
 ## Run End-to-End Locally
 
 ### Option 1: Test Individual Components
@@ -81,7 +130,12 @@ cd api
 python job_controller.py
 ```
 
-#### 3. Trigger Job
+#### 3. Use CLI Tool
+```bash
+python clipper.py --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+Or use curl:
 ```bash
 curl -X POST http://localhost:8080/jobs \
   -H "Content-Type: application/json" \
@@ -145,21 +199,18 @@ For a 10-minute video:
 
 ## Output
 
-Completed job returns:
+Completed job saves clips to `outputs/` with this structure:
 ```json
 {
   "job_id": "...",
-  "status": "completed",
   "clips": [
     {
       "clip_id": "clip_001",
-      "mp4_url": "file:///tmp/...",
-      "score": 0.92
+      "path": "C:/Users/sal/.../outputs/.../clip_001.mp4",
+      "score": 0.92,
+      "size_mb": 15.3
     }
   ],
-  "metadata": {
-    "strategy_used": "gumloop_llm",
-    "model_used": "gumloop_best_reasoning"
-  }
+  "job_dir": "C:/Users/sal/.../outputs/20260117_..."
 }
 ```

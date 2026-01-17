@@ -98,6 +98,8 @@ async def get_job_result(job_id: str):
 
 async def process_render_job(job_id: str, request: RenderRequest):
     """Process render job asynchronously."""
+    from utils.output_manager import OutputManager
+    
     job = job_store[job_id]
     job["status"] = "processing"
     
@@ -123,18 +125,33 @@ async def process_render_job(job_id: str, request: RenderRequest):
                     temp_dir
                 )
                 
-                # In production: upload to storage and return URI
-                # For now, return local path
+                # Temporary result (will be moved by OutputManager)
                 rendered_clips.append({
                     "clip_id": clip_data['clip_id'],
-                    "mp4_url": str(output_path),
+                    "mp4_url": f"file://{output_path}",
                     "score": clip_data.get('score', 0.0)
                 })
                 
                 job["progress"] = (i + 1) / total_clips
+            
+            # Save to permanent storage using OutputManager
+            output_mgr = OutputManager()
+            saved_results = output_mgr.save_job_results(
+                job_id=job_id,
+                video_url=request.video_uri,
+                clips=rendered_clips,
+                metadata={
+                    "total_clips": len(rendered_clips),
+                    "render_timestamp": str(asyncio.get_event_loop().time())
+                }
+            )
+            
+            # Update job with permanent paths
+            job["clips"] = saved_results["clips"]
+            job["job_dir"] = saved_results["job_dir"]
+            job["manifest_path"] = saved_results["manifest_path"]
         
         job["status"] = "completed"
-        job["clips"] = rendered_clips
         job["progress"] = 1.0
         
     except Exception as e:
