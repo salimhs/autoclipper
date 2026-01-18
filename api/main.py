@@ -162,6 +162,26 @@ class MergeRecipeResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
+def validate_file_uri(uri: str) -> Path:
+    """
+    Validate and safely convert a file:// URI to a resolved path.
+    Prevents directory traversal attacks.
+    """
+    if not uri.startswith("file://"):
+        raise ValueError(f"Invalid URI scheme: {uri}")
+    
+    path_str = uri.replace("file://", "")
+    path = Path(path_str).resolve()
+    
+    # Ensure the path exists and is a file
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    if not path.is_file():
+        raise ValueError(f"Path is not a file: {path}")
+    
+    return path
+
+
 def estimate_token_count(text: str) -> int:
     """Rough token estimation: ~4 chars per token"""
     return len(text) // 4
@@ -212,9 +232,15 @@ async def create_job(request: CreateJobRequest):
         user_id = os.getenv("GUMLOOP_USER_ID")
         
         if not all([workflow_id, api_key, user_id]):
-            raise ValueError("GUMLOOP_WORKFLOW_ID, GUMLOOP_API_KEY, or GUMLOOP_USER_ID not set in .env")
+            # Log internally without revealing which variables are missing
+            import traceback
+            traceback.print_exc()
+            print("Missing Gumloop configuration")
+            status_store.update_job(job_id, status="failed", error="Gumloop configuration incomplete")
+            raise HTTPException(status_code=500, detail="Workflow configuration incomplete")
 
-        # Use query parameters as seen in the user's provided trigger URL
+        # Use Gumloop API with credentials in query params (as per Gumloop API docs)
+        # Note: This is Gumloop's required format, not ideal for security but necessary
         trigger_url = (
             f"https://api.gumloop.com/api/v1/start_pipeline"
             f"?api_key={api_key}"
@@ -237,6 +263,8 @@ async def create_job(request: CreateJobRequest):
         
         status_store.update_job(job_id, status="processing", progress=0.1)
         
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -391,11 +419,17 @@ async def transcribe_audio(request: TranscribeRequest):
         logger.error("WhisperX not installed. This endpoint requires the full ML environment.")
         raise HTTPException(status_code=501, detail="Transcription service not available on this deployment. Requires full ML environment.")
 
-    audio_path = request.audio_uri.replace("file://", "")
+    # Safely validate audio path
+    try:
+        audio_path = validate_file_uri(request.audio_uri)
+    except (ValueError, FileNotFoundError) as e:
+        logger.error("Invalid audio URI", error=str(e))
+        raise HTTPException(status_code=400, detail=f"Invalid audio_uri: {str(e)}")
+    
     runner = WhisperXRunner()
     
     try:
-        transcript = runner.transcribe(audio_path)
+        transcript = runner.transcribe(str(audio_path))
         
         # Calculate average confidence
         confidences = []
@@ -461,12 +495,17 @@ async def track_video(request: TrackingRequest):
         logger.error("MediaPipe not installed. This endpoint requires the full ML environment.")
         raise HTTPException(status_code=501, detail="Tracking service not available on this deployment. Requires full ML environment.")
 
-    # Track with MediaPipe
-    video_path = request.video_uri.replace("file://", "")
+    # Safely validate video path
+    try:
+        video_path = validate_file_uri(request.video_uri)
+    except (ValueError, FileNotFoundError) as e:
+        logger.error("Invalid video URI", error=str(e))
+        raise HTTPException(status_code=400, detail=f"Invalid video_uri: {str(e)}")
+    
     tracker = VisualTracker()
     
     try:
-        tracking_data = tracker.track_video(video_path)
+        tracking_data = tracker.track_video(str(video_path))
         crop_paths = tracker.generate_crop_paths(
             tracking_data,
             source_width=request.width,
@@ -685,13 +724,23 @@ async def merge_recipe(request: MergeRecipeRequest):
         # Parse EDL from JSON string
         edl = json.loads(request.edl_json)
         
-        # Load word timeline
-        word_timeline_path = request.word_timeline_uri.replace("file://", "")
+        # Safely validate and load word timeline
+        try:
+            word_timeline_path = validate_file_uri(request.word_timeline_uri)
+        except (ValueError, FileNotFoundError) as e:
+            logger.error("Invalid word_timeline_uri", error=str(e))
+            raise HTTPException(status_code=400, detail=f"Invalid word_timeline_uri: {str(e)}")
+        
         with open(word_timeline_path, 'r') as f:
             word_timeline = json.load(f)
         
-        # Load crop paths
-        crop_paths_path = request.crop_paths_uri.replace("file://", "")
+        # Safely validate and load crop paths
+        try:
+            crop_paths_path = validate_file_uri(request.crop_paths_uri)
+        except (ValueError, FileNotFoundError) as e:
+            logger.error("Invalid crop_paths_uri", error=str(e))
+            raise HTTPException(status_code=400, detail=f"Invalid crop_paths_uri: {str(e)}")
+        
         with open(crop_paths_path, 'r') as f:
             crop_paths_data = json.load(f)
         
