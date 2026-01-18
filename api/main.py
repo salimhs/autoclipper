@@ -331,7 +331,6 @@ async def gumloop_webhook(job_id: str, payload: Dict[str, Any]):
 # ============================================================================
 
 @app.post("/api/download", response_model=DownloadResponse)
-@retry_with_backoff(max_retries=3)
 async def download_video(request: DownloadRequest):
     """Download video and extract audio using yt-dlp and ffmpeg."""
     logger = StructuredLogger(request.job_id, "download")
