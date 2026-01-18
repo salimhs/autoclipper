@@ -17,13 +17,11 @@ from fractions import Fraction
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import existing modules
-from perception.whisperx_runner import WhisperXRunner
-from perception.tracking import VisualTracker
-from ai.llm_provider import get_provider
+# Import lightweight utilities
 from utils.logger import StructuredLogger
 from utils.cache import CacheManager
 from utils.retry import retry_with_backoff
+# Heavy ML imports moved inside endpoints to support slim deployments
 
 
 app = FastAPI(title="AutoClipper Gumloop Gateway", version="1.0.0")
@@ -177,7 +175,13 @@ async def transcribe_audio(request: TranscribeRequest):
             confidence_average=1.0
         )
     
-    # Transcribe with WhisperX
+    # Heavy ML import
+    try:
+        from perception.whisperx_runner import WhisperXRunner
+    except ImportError:
+        logger.error("WhisperX not installed. This endpoint requires the full ML environment.")
+        raise HTTPException(status_code=501, detail="Transcription service not available on this deployment. Requires full ML environment.")
+
     audio_path = request.audio_uri.replace("file://", "")
     runner = WhisperXRunner()
     
@@ -241,6 +245,13 @@ async def track_video(request: TrackingRequest):
             crop_paths_uri=f"file://{crop_paths_path}"
         )
     
+    # Heavy ML import
+    try:
+        from perception.tracking import VisualTracker
+    except ImportError:
+        logger.error("MediaPipe not installed. This endpoint requires the full ML environment.")
+        raise HTTPException(status_code=501, detail="Tracking service not available on this deployment. Requires full ML environment.")
+
     # Track with MediaPipe
     video_path = request.video_uri.replace("file://", "")
     tracker = VisualTracker()
@@ -288,8 +299,12 @@ async def select_clips(request: ClipSelectionRequest):
     logger = StructuredLogger(request.job_id, "select_clips")
     
     try:
+        from ai.llm_provider import get_provider
         # Get appropriate provider
         provider = get_provider(request.strategy)
+    except Exception as e:
+        logger.error("LLM Provider initialization failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"LLM Provider error: {str(e)}")
         
         # Extract text from transcript
         full_text = " ".join(
@@ -322,7 +337,11 @@ async def repair_edl(request: RepairRequest):
     logger = StructuredLogger(request.job_id, "repair_edl")
     
     try:
+        from ai.llm_provider import get_provider
         provider = get_provider(request.repair_strategy)
+    except Exception as e:
+        logger.error("LLM Provider initialization failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"LLM Provider error: {str(e)}")
         
         # Build repair instructions
         repair_prompt = f"""The following EDL JSON has validation errors:
