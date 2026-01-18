@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
 from dotenv import load_dotenv
+from pathlib import Path
 
 from .status_store import StatusStore
 
@@ -166,11 +167,19 @@ async def gumloop_webhook(job_id: str, payload: Dict[str, Any]):
 
 # Serve the lightweight dashboard UI (static) from /.
 # Moved to bottom to avoid intercepting /jobs routes
-app.mount(
-    "/",
-    StaticFiles(directory="api/static", html=True),
-    name="static",
-)
+# Only mount static files if the directory exists (optional for Railway deployment)
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists() and static_dir.is_dir():
+    try:
+        app.mount(
+            "/",
+            StaticFiles(directory="api/static", html=True),
+            name="static",
+        )
+    except Exception as e:
+        print(f"Warning: Could not mount static files: {e}")
+else:
+    print("Static directory not found, skipping static file serving")
 
 
 if __name__ == "__main__":
