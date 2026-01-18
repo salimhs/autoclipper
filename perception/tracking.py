@@ -3,8 +3,6 @@ Visual tracking service using MediaPipe for face detection.
 Generates crop paths for vertical video conversion.
 """
 
-import cv2
-import mediapipe as mp
 import json
 from typing import Dict, Any, List, Tuple
 from pathlib import Path
@@ -12,6 +10,7 @@ from pathlib import Path
 
 class VisualTracker:
     def __init__(self):
+        import mediapipe as mp
         self.mp_face_detection = mp.solutions.face_detection
         self.face_detection = self.mp_face_detection.FaceDetection(
             model_selection=1,  # Full-range model
@@ -29,6 +28,8 @@ class VisualTracker:
         Returns:
             Dict matching schemas/tracking.json
         """
+        import cv2
+        
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         

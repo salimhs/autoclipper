@@ -17,7 +17,8 @@ from fractions import Fraction
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import lightweight utilities
+# Import existing modules (lazy-loaded heavy dependencies in functions)
+from ai.llm_provider import get_provider
 from utils.logger import StructuredLogger
 from utils.cache import CacheManager
 from utils.retry import retry_with_backoff
@@ -156,6 +157,8 @@ async def download_video(request: DownloadRequest):
 @app.post("/api/transcribe", response_model=TranscribeResponse)
 async def transcribe_audio(request: TranscribeRequest):
     """Transcribe audio using WhisperX with caching."""
+    from perception.whisperx_runner import WhisperXRunner
+    
     logger = StructuredLogger(request.job_id, "transcribe")
     cache = CacheManager()
     
@@ -223,6 +226,8 @@ async def transcribe_audio(request: TranscribeRequest):
 @app.post("/api/track", response_model=TrackingResponse)
 async def track_video(request: TrackingRequest):
     """Track faces and generate crop paths using MediaPipe."""
+    from perception.tracking import VisualTracker
+    
     logger = StructuredLogger(request.job_id, "track")
     cache = CacheManager()
     
