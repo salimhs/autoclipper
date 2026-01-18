@@ -1,34 +1,40 @@
-# Use official Python slim image for a small footprint
-FROM python:3.10-slim
+# Stage: builder - builds wheels for heavy deps
+FROM python:3.11-slim AS builder
 
-# Set working directory
+ENV PIP_DEFAULT_TIMEOUT=100 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    curl \
-    git \
-    build-essential \
-    python3-dev \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      build-essential gcc git curl ca-certificates \
+      ffmpeg libgl1 libglib2.0-0 pkg-config libffi-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements-full.txt .
+COPY requirements-runtime.txt requirements-runtime.txt
+COPY requirements-worker.txt requirements-worker.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements-full.txt
+RUN python -m pip install --upgrade pip wheel setuptools && \
+    pip wheel --wheel-dir=/wheels -r requirements-runtime.txt --no-cache-dir --prefer-binary && \
+    pip wheel --wheel-dir=/wheels -r requirements-worker.txt --no-cache-dir --prefer-binary || true
 
-# Copy the rest of the application code
-COPY . .
+# Stage: runtime - API only
+FROM python:3.11-slim
 
-# Set PYTHONPATH to include the current directory
+RUN useradd --create-home --no-log-init appuser
+WORKDIR /app
+
+COPY --from=builder /wheels /wheels
+COPY requirements-runtime.txt requirements-runtime.txt
+COPY . /app
+
+RUN python -m pip install --upgrade pip && \
+    pip install --no-cache-dir --no-index --find-links=/wheels -r requirements-runtime.txt && \
+    rm -rf /wheels
+
 ENV PYTHONPATH=/app
-
-# Expose the port (Railway uses PORT environment variable)
+USER appuser
 EXPOSE 8081
-
-# Command to run the Gumloop Gateway API using the shell to expand $PORT
-CMD uvicorn api.gumloop_gateway:app --host 0.0.0.0 --port ${PORT:-8081}
+CMD ["uvicorn", "api.gumloop_gateway:app", "--host", "0.0.0.0", "--port", "${PORT:-8081}"]

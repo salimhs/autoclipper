@@ -1,0 +1,7 @@
+# Heavy worker/perception deps
+numpy>=2.0.2,<2.1.0
+git+https://github.com/m-bain/whisperX.git@main
+mediapipe>=0.10.14
+opencv-python-headless>=4.9.0
+yt-dlp
+# Add other heavy libs used only by perception/worker
