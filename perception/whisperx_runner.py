@@ -2,7 +2,6 @@
 WhisperX transcription service with word-level alignment.
 """
 
-import whisperx
 import json
 from pathlib import Path
 from typing import Dict, Any
@@ -18,6 +17,7 @@ class WhisperXRunner:
     
     def load_model(self, model_name: str = "large-v2"):
         """Load WhisperX model."""
+        import whisperx
         self.model = whisperx.load_model(
             model_name,
             self.device,
@@ -35,6 +35,8 @@ class WhisperXRunner:
         Returns:
             Dict matching schemas/transcript.json
         """
+        import whisperx
+        
         if self.model is None:
             self.load_model()
         
