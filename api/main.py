@@ -615,14 +615,18 @@ async def validate_edl(request: ValidateEDLRequest):
         
         # Validate each clip
         for i, clip in enumerate(clips):
+            initial_error_count = len(errors)
+            
             # Required fields
             required_fields = ["clip_id", "start_sec", "end_sec", "title", "hook_text", "score"]
             for field in required_fields:
                 if field not in clip:
                     errors.append(f"Clip {i}: missing required field '{field}'")
             
-            if errors:
-                continue  # Skip further validation for this clip
+            # Skip further validation for this clip if fields are missing
+            clip_has_errors = len(errors) > initial_error_count
+            if clip_has_errors:
+                continue
             
             # Duration constraints (15-90 seconds)
             duration = clip["end_sec"] - clip["start_sec"]
@@ -678,11 +682,8 @@ async def merge_recipe(request: MergeRecipeRequest):
     logger = StructuredLogger(request.job_id, "merge_recipe")
     
     try:
-        # Parse EDL if it's a string
-        if isinstance(request.edl_json, str):
-            edl = json.loads(request.edl_json)
-        else:
-            edl = request.edl_json
+        # Parse EDL from JSON string
+        edl = json.loads(request.edl_json)
         
         # Load word timeline
         word_timeline_path = request.word_timeline_uri.replace("file://", "")

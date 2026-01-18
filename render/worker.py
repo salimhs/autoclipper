@@ -87,7 +87,11 @@ async def get_job_status(job_id: str):
     # Extract clip URLs if completed
     clip_urls = None
     if job["status"] == "completed":
-        clip_urls = [clip.get("mp4_url") for clip in job.get("clips", []) if clip.get("mp4_url")]
+        clip_urls = []
+        for clip in job.get("clips", []):
+            url = clip.get("mp4_url")
+            if url:  # Filter out None and empty strings
+                clip_urls.append(url)
     
     return JobStatus(
         job_id=job_id,
