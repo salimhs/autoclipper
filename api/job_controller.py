@@ -12,7 +12,7 @@ import uuid
 import requests
 from datetime import datetime
 
-from .status_store import StatusStore
+from status_store import StatusStore
 
 
 app = FastAPI(title="AutoClipper API")
@@ -67,15 +67,17 @@ async def create_job(request: CreateJobRequest):
     # Store initial job state
     status_store.create_job(
         job_id=job_id,
-        video_url=str(request.video_url),
-        webhook_url=str(request.webhook_url) if request.webhook_url else None
+        payload={
+            "video_url": str(request.video_url),
+            "webhook_url": str(request.webhook_url) if request.webhook_url else None
+        }
     )
     
     # Trigger Gumloop workflow
     try:
         # Replace with actual Gumloop API endpoint
         gumloop_response = requests.post(
-            "https://api.gumloop.com/v1/workflows/{workflow_id}/trigger",
+            f"https://api.gumloop.com/v1/workflows/{{workflow_id}}/trigger",
             json={
                 "job_id": job_id,
                 "video_url": str(request.video_url)
@@ -86,7 +88,7 @@ async def create_job(request: CreateJobRequest):
         )
         gumloop_response.raise_for_status()
         
-        status_store.update_job(job_id, status="processing", progress="url_validation")
+        status_store.update_job(job_id, status="processing", progress=0.1)
         
     except Exception as e:
         status_store.update_job(job_id, status="failed", error=str(e))

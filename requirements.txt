@@ -2,8 +2,10 @@ fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
 google-generativeai==0.3.2
+git+https://github.com/m-bain/whisperX.git
 mediapipe==0.10.31
 opencv-python==4.9.0.80
 requests==2.31.0
 yt-dlp
 jsonschema==4.20.0
+python-dotenv==1.0.1
