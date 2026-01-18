@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
 from dotenv import load_dotenv
 
-from status_store import StatusStore
+from .status_store import StatusStore
 
 # Load environment variables
 load_dotenv()

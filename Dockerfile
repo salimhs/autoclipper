@@ -5,8 +5,6 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies
-# Added build-essential and python3-dev for building packages from source
-# Added libgl1 and libglib2.0-0 for opencv/mediapipe
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
@@ -21,14 +19,16 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-# Increased timeout for larger packages like torch/whisperX
 RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port
+# Set PYTHONPATH to include the current directory
+ENV PYTHONPATH=/app
+
+# Expose the port (Railway uses PORT environment variable)
 EXPOSE 8080
 
-# Command to run the Job Controller
-CMD ["uvicorn", "api.job_controller:app", "--host", "0.0.0.0", "--port", "8080"]
+# Command to run the Job Controller using the shell to expand $PORT
+CMD uvicorn api.job_controller:app --host 0.0.0.0 --port ${PORT:-8080}
