@@ -7,6 +7,8 @@ import argparse
 import sys
 import json
 import time
+import os
+import requests
 from pathlib import Path
 from utils.output_manager import OutputManager
 
@@ -172,6 +174,12 @@ def process_video(url: str, output_mgr: OutputManager):
             
             time.sleep(2)
     
+    except requests.exceptions.HTTPError as e:
+        try:
+            detail = e.response.json().get("detail", "Unknown server error")
+            print(f"\n[ERROR] {e.response.status_code} Server Error: {detail}")
+        except:
+            print(f"\n[ERROR] {e}")
     except requests.exceptions.ConnectionError:
         print("[ERROR] Could not connect to API server.")
         print("Make sure the server is running: python api/job_controller.py")
