@@ -26,6 +26,18 @@ FROM python:3.11-slim AS runtime
 RUN useradd --create-home --no-log-init appuser
 WORKDIR /app
 
+# Install system dependencies needed for video processing
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install yt-dlp
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
+
 COPY requirements-runtime.txt requirements-runtime.txt
 COPY . /app
 
