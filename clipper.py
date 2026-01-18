@@ -165,7 +165,7 @@ def process_video(url: str, output_mgr: OutputManager):
             
             status_response = requests.get(
                 f"{backend_url.rstrip('/')}/jobs/{job_id}",
-                timeout=10
+                timeout=30
             )
             status_response.raise_for_status()
             
