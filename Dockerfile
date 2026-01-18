@@ -21,18 +21,16 @@ RUN python -m pip install --upgrade pip wheel setuptools && \
     pip wheel --wheel-dir=/wheels -r requirements-worker.txt --no-cache-dir --prefer-binary || true
 
 # Stage: runtime - API only
-FROM python:3.11-slim
+FROM python:3.11-slim AS runtime
 
 RUN useradd --create-home --no-log-init appuser
 WORKDIR /app
 
-COPY --from=builder /wheels /wheels
 COPY requirements-runtime.txt requirements-runtime.txt
 COPY . /app
 
 RUN python -m pip install --upgrade pip && \
-    pip install --no-cache-dir --no-index --find-links=/wheels -r requirements-runtime.txt && \
-    rm -rf /wheels
+    pip install --no-cache-dir -r requirements-runtime.txt
 
 ENV PYTHONPATH=/app
 USER appuser
