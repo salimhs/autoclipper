@@ -16,10 +16,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements-full.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=100 -r requirements-full.txt
 
 # Copy the rest of the application code
 COPY . .
