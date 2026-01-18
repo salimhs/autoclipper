@@ -49,6 +49,7 @@ logs/
 tmp/
 temp/
 *.tmp
+job_status.json
 
 # Cache
 .cache/
