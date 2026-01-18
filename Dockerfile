@@ -35,4 +35,4 @@ RUN python -m pip install --upgrade pip && \
 ENV PYTHONPATH=/app
 USER appuser
 EXPOSE 8081
-CMD uvicorn api.gumloop_gateway:app --host 0.0.0.0 --port ${PORT:-8081}
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8081}

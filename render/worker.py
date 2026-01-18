@@ -40,6 +40,7 @@ class JobStatus(BaseModel):
     status: str  # pending, processing, completed, failed
     progress: Optional[float] = None
     error: Optional[str] = None
+    clip_urls: Optional[List[str]] = None  # NEW - populated when completed
 
 
 class RenderResult(BaseModel):
@@ -82,11 +83,18 @@ async def get_job_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     
     job = job_store[job_id]
+    
+    # Extract clip URLs if completed
+    clip_urls = None
+    if job["status"] == "completed":
+        clip_urls = [clip.get("mp4_url") for clip in job.get("clips", []) if clip.get("mp4_url")]
+    
     return JobStatus(
         job_id=job_id,
         status=job["status"],
         progress=job.get("progress"),
-        error=job.get("error")
+        error=job.get("error"),
+        clip_urls=clip_urls
     )
 
 
@@ -125,6 +133,11 @@ async def process_render_job(job_id: str, recipe: RenderRecipe):
                 
                 loop = asyncio.get_event_loop()
                 video_path = recipe.video_uri.replace("file://", "")
+                
+                # Support both field names for backwards compatibility
+                crop_data = clip_data.get('crop_path', clip_data.get('crop_paths', []))
+                subtitle_data = clip_data.get('subtitles', clip_data.get('words', []))
+                
                 await loop.run_in_executor(
                     executor,
                     FFmpegRenderer.render_clip,
@@ -132,8 +145,8 @@ async def process_render_job(job_id: str, recipe: RenderRecipe):
                     str(output_path),
                     clip_data['start_sec'],
                     clip_data['end_sec'],
-                    clip_data.get('crop_paths', []), # Use crop_paths from recipe
-                    clip_data.get('words', []),      # Use words from recipe
+                    crop_data,
+                    subtitle_data,
                     temp_dir
                 )
                 

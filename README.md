@@ -29,3 +29,16 @@ All components communicate via JSON + storage URIs.
 5. Merge render recipe
 6. Render clips
 7. Return outputs
+
+## Environment Variables
+
+### Required
+- `GUMLOOP_WORKFLOW_ID` - Your Gumloop workflow ID
+- `GUMLOOP_API_KEY` - Your Gumloop API key
+- `GUMLOOP_USER_ID` - Your Gumloop user ID
+- `GEMINI_API_KEY` - Google Gemini API key (for fallback LLM)
+
+### Optional
+- `LLM_TOKEN_THRESHOLD` - Token count threshold for LLM routing (default: 80000)
+- `RENDER_WORKER_URL` - URL of render worker service (default: http://localhost:8000)
+- `PORT` - Server port (default: 8081)
