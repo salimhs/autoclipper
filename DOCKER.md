@@ -63,7 +63,7 @@ The runtime image is optimized for Railway deployment:
 1. **Automatic Build**: Railway will build the Docker image from the Dockerfile
 2. **Size**: Runtime image is <500MB (well under Railway's 4GB limit)
 3. **PORT Variable**: Railway automatically sets the PORT environment variable
-4. **Entry Point**: `uvicorn api.gumloop_gateway:app --host 0.0.0.0 --port ${PORT:-8081}`
+4. **Entry Point**: `uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8081}`
 
 ### Manual Deploy to Railway
 ```bash
