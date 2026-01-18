@@ -14,7 +14,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements-runtime.txt requirements-runtime.txt
-COPY requirements-worker.txt requirements-worker.txtS
+COPY requirements-worker.txt requirements-worker.txt
 
 RUN python -m pip install --upgrade pip wheel setuptools && \
     pip wheel --wheel-dir=/wheels -r requirements-runtime.txt --no-cache-dir --prefer-binary && \
@@ -35,4 +35,4 @@ RUN python -m pip install --upgrade pip && \
 ENV PYTHONPATH=/app
 USER appuser
 EXPOSE 8081
-CMD uvicorn api.gumloop_gateway:app --host 0.0.0.0 --port ${PORT:-8081}
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8081}

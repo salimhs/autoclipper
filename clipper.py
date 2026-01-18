@@ -125,14 +125,14 @@ def process_video(url: str, output_mgr: OutputManager):
     """Process a video URL."""
     print(f"\n{'='*80}")
     print(f"Processing video: {url}\n")
-    print("NOTE: This requires the API server to be running.")
-    print("Start it with: python api/job_controller.py\n")
+    print("NOTE: This requires the AutoClipper API server to be running.")
+    print("Start it with: python -m api.main or uvicorn api.main:app\n")
     
     # Determine backend URL (local or cloud)
     backend_url = os.environ.get("CLI_BACKEND_URL", "http://localhost:8081")
     
     try:
-        # Submit job
+        # Submit job to unified API
         response = requests.post(
             f"{backend_url.rstrip('/')}/jobs",
             json={"video_url": url},
@@ -205,8 +205,11 @@ def process_video(url: str, output_mgr: OutputManager):
         except:
             print(f"\n[ERROR] {e}")
     except requests.exceptions.ConnectionError:
-        print("[ERROR] Could not connect to API server.")
-        print("Make sure the server is running: python api/job_controller.py")
+        print("[ERROR] Could not connect to AutoClipper API server.")
+        print(f"Tried: {backend_url}")
+        print("\nMake sure the server is running:")
+        print("  Local: uvicorn api.main:app --host 0.0.0.0 --port 8081")
+        print("  Or set CLI_BACKEND_URL to point to cloud deployment")
         sys.exit(1)
     
     except Exception as e:
