@@ -140,18 +140,42 @@ def process_video(url: str, output_mgr: OutputManager):
         )
         response.raise_for_status()
         
-        job_id = response.json()["job_id"]
+        # Parse response with error handling
+        try:
+            response_data = response.json()
+            job_id = response_data.get("job_id")
+            if not job_id:
+                raise ValueError("No job_id in server response")
+        except (KeyError, ValueError, json.JSONDecodeError) as e:
+            print(f"\n[ERROR] Invalid response from server: {e}")
+            sys.exit(1)
+        
         print(f"Job submitted: {job_id}")
         print("Waiting for completion...\n")
         
-        # Poll for completion
+        # Poll for completion with timeout
+        max_wait_time = 3600  # 1 hour timeout
+        start_time = time.time()
+        
         while True:
+            # Check timeout
+            if time.time() - start_time > max_wait_time:
+                print("\n[ERROR] Job timeout - exceeded maximum wait time (1 hour)")
+                sys.exit(1)
+            
             status_response = requests.get(
-                f"http://localhost:8081/jobs/{job_id}",
+                f"{backend_url.rstrip('/')}/jobs/{job_id}",
                 timeout=10
             )
             status_response.raise_for_status()
-            status = status_response.json()
+            
+            # Parse status with error handling
+            try:
+                status = status_response.json()
+            except json.JSONDecodeError as e:
+                print(f"\n[ERROR] Invalid status response: {e}")
+                time.sleep(2)
+                continue
             
             print(f"Status: {status['status']}", end="\r")
             

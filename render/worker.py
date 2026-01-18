@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uuid
 import json
+import os
 from pathlib import Path
 import tempfile
 import asyncio
@@ -65,9 +66,12 @@ async def create_render_job(request: RenderRequest):
     # Start async rendering
     asyncio.create_task(process_render_job(job_id, request.render_recipe))
     
+    # Use environment variable for base URL (supports production deployment)
+    base_url = os.environ.get("RENDER_WORKER_URL", "http://localhost:8000")
+    
     return {
         "render_task_id": job_id,
-        "status_url": f"http://localhost:8000/status/{job_id}"
+        "status_url": f"{base_url.rstrip('/')}/status/{job_id}"
     }
 
 

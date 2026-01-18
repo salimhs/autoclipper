@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, Any
+from fractions import Fraction
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -144,7 +145,7 @@ async def download_video(request: DownloadRequest):
             video_uri=f"file://{video_path}",
             audio_uri=f"file://{audio_path}",
             duration_sec=float(metadata['format']['duration']),
-            fps=eval(video_stream['r_frame_rate']),
+            fps=float(Fraction(video_stream['r_frame_rate'])),
             width=int(video_stream['width']),
             height=int(video_stream['height'])
         )
