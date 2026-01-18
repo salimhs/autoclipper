@@ -131,7 +131,7 @@ def process_video(url: str, output_mgr: OutputManager):
     try:
         # Submit job
         response = requests.post(
-            "http://localhost:8080/jobs",
+            "http://localhost:8081/jobs",
             json={"video_url": url},
             timeout=10
         )
@@ -144,7 +144,7 @@ def process_video(url: str, output_mgr: OutputManager):
         # Poll for completion
         while True:
             status_response = requests.get(
-                f"http://localhost:8080/jobs/{job_id}",
+                f"http://localhost:8081/jobs/{job_id}",
                 timeout=10
             )
             status_response.raise_for_status()
@@ -153,34 +153,31 @@ def process_video(url: str, output_mgr: OutputManager):
             print(f"Status: {status['status']}", end="\r")
             
             if status["status"] == "completed":
-                print("\n\n✓ Job completed!")
+                print("\n\n[SUCCESS] Job completed!")
                 
-                # Get results
-                result = requests.get(
-                    f"http://localhost:8080/jobs/{job_id}/result",
-                    timeout=10
-                ).json()
+                clips = status.get("clips", [])
+                print(f"\nGenerated {len(clips)} clips:")
+                for clip in clips:
+                    # Handle both path and mp4_url
+                    path = clip.get('path') or clip.get('mp4_url') or "N/A"
+                    print(f"  - {clip.get('clip_id', 'unknown')}: {path}")
                 
-                print(f"\nGenerated {len(result['clips'])} clips:")
-                for clip in result['clips']:
-                    print(f"  - {clip['clip_id']}: {clip['path']}")
-                
-                print(f"\nAll clips saved to: {result.get('job_dir', 'outputs/')}")
+                print(f"\nAll clips saved to your local outputs/ directory (handled by Render Worker).")
                 break
             
             elif status["status"] == "failed":
-                print(f"\n\n✗ Job failed: {status.get('error', 'Unknown error')}")
+                print(f"\n\n[FAILED] Job failed: {status.get('error', 'Unknown error')}")
                 sys.exit(1)
             
             time.sleep(2)
     
     except requests.exceptions.ConnectionError:
-        print("✗ Error: Could not connect to API server.")
+        print("[ERROR] Could not connect to API server.")
         print("Make sure the server is running: python api/job_controller.py")
         sys.exit(1)
     
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"[ERROR] {e}")
         sys.exit(1)
 
 

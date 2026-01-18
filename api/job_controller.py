@@ -3,36 +3,33 @@ Job management API for AutoClipper.
 Triggers Gumloop workflows and tracks job state.
 """
 
+import os
+import uuid
+import requests
+from datetime import datetime
+from typing import Optional, Dict, Any
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, Dict, Any
-import uuid
-import requests
-from datetime import datetime
+from dotenv import load_dotenv
 
 from status_store import StatusStore
 
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="AutoClipper API")
 status_store = StatusStore()
 
 # Allow the frontend to call the API in hackathon/dev setups.
-# In production, restrict origins.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# Serve the lightweight dashboard UI (static) from /.
-app.mount(
-    "/",
-    StaticFiles(directory="api/static", html=True),
-    name="static",
 )
 
 
@@ -51,7 +48,7 @@ class JobResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     job_id: str
     status: str
-    progress: Optional[str] = None
+    progress: Optional[float] = None
     clips: Optional[list] = None
     error: Optional[str] = None
 
@@ -75,22 +72,40 @@ async def create_job(request: CreateJobRequest):
     
     # Trigger Gumloop workflow
     try:
-        # Replace with actual Gumloop API endpoint
+        workflow_id = os.getenv("GUMLOOP_WORKFLOW_ID")
+        api_key = os.getenv("GUMLOOP_API_KEY")
+        user_id = os.getenv("GUMLOOP_USER_ID")
+        
+        if not all([workflow_id, api_key, user_id]):
+            raise ValueError("GUMLOOP_WORKFLOW_ID, GUMLOOP_API_KEY, or GUMLOOP_USER_ID not set in .env")
+
+        # Use query parameters as seen in the user's provided trigger URL
+        trigger_url = (
+            f"https://api.gumloop.com/api/v1/start_pipeline"
+            f"?api_key={api_key}"
+            f"&user_id={user_id}"
+            f"&saved_item_id={workflow_id}"
+        )
+
         gumloop_response = requests.post(
-            f"https://api.gumloop.com/v1/workflows/{{workflow_id}}/trigger",
+            trigger_url,
             json={
-                "job_id": job_id,
-                "video_url": str(request.video_url)
+                "video_url": str(request.video_url),
+                "job_id": job_id
             },
             headers={
-                "Authorization": "Bearer {GUMLOOP_API_KEY}"
-            }
+                "Content-Type": "application/json"
+            },
+            timeout=30
         )
         gumloop_response.raise_for_status()
         
         status_store.update_job(job_id, status="processing", progress=0.1)
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error triggering Gumloop: {e}")
         status_store.update_job(job_id, status="failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to trigger workflow: {e}")
     
@@ -110,7 +125,14 @@ async def get_job_status(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    return JobStatusResponse(**job)
+    # Convert JobRecord to dict properly
+    return JobStatusResponse(
+        job_id=job.job_id,
+        status=job.status,
+        progress=job.progress,
+        clips=job.result.get("clips"),
+        error=job.error
+    )
 
 
 @app.post("/webhooks/gumloop/{job_id}")
@@ -127,21 +149,32 @@ async def gumloop_webhook(job_id: str, payload: Dict[str, Any]):
         job_id=job_id,
         status=status,
         progress=progress,
-        clips=clips,
+        result={"clips": clips} if clips else {},
         error=error
     )
     
     # Trigger user webhook if configured
     job = status_store.get_job(job_id)
-    if job.get("webhook_url") and status in ["completed", "failed"]:
+    if job and job.payload.get("webhook_url") and status in ["completed", "failed"]:
         try:
-            requests.post(job["webhook_url"], json=job)
+            requests.post(job.payload["webhook_url"], json=status_store.as_dict(job))
         except:
             pass
     
     return {"status": "ok"}
 
 
+# Serve the lightweight dashboard UI (static) from /.
+# Moved to bottom to avoid intercepting /jobs routes
+app.mount(
+    "/",
+    StaticFiles(directory="api/static", html=True),
+    name="static",
+)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    import os
+    port = int(os.environ.get("PORT", 8081))
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -24,9 +24,14 @@ job_store: Dict[str, Dict[str, Any]] = {}
 executor = ProcessPoolExecutor(max_workers=4)
 
 
-class RenderRequest(BaseModel):
+class RenderRecipe(BaseModel):
     video_uri: str
     clips: List[Dict[str, Any]]
+
+
+class RenderRequest(BaseModel):
+    render_recipe: RenderRecipe
+    job_id: str
 
 
 class JobStatus(BaseModel):
@@ -44,24 +49,26 @@ class RenderResult(BaseModel):
 @app.post("/render", response_model=Dict[str, str])
 async def create_render_job(request: RenderRequest):
     """
-    Create a new render job.
-    
-    Returns:
-        {"job_id": "..."}
+    Create a new render job based on a recipe.
+    Matches Gumloop Node #12 expectation.
     """
-    job_id = str(uuid.uuid4())
+    # Use provided job_id or generate one
+    job_id = request.job_id
     
     job_store[job_id] = {
         "status": "pending",
-        "request": request.dict(),
+        "recipe": request.render_recipe.dict(),
         "clips": [],
         "progress": 0.0
     }
     
     # Start async rendering
-    asyncio.create_task(process_render_job(job_id, request))
+    asyncio.create_task(process_render_job(job_id, request.render_recipe))
     
-    return {"job_id": job_id}
+    return {
+        "render_task_id": job_id,
+        "status_url": f"http://localhost:8000/status/{job_id}"
+    }
 
 
 @app.get("/status/{job_id}", response_model=JobStatus)
@@ -96,7 +103,7 @@ async def get_job_result(job_id: str):
     )
 
 
-async def process_render_job(job_id: str, request: RenderRequest):
+async def process_render_job(job_id: str, recipe: RenderRecipe):
     """Process render job asynchronously."""
     from utils.output_manager import OutputManager
     
@@ -104,28 +111,29 @@ async def process_render_job(job_id: str, request: RenderRequest):
     job["status"] = "processing"
     
     try:
-        total_clips = len(request.clips)
+        total_clips = len(recipe.clips)
         rendered_clips = []
         
         with tempfile.TemporaryDirectory() as temp_dir:
-            for i, clip_data in enumerate(request.clips):
+            for i, clip_data in enumerate(recipe.clips):
                 # Render single clip
                 output_path = Path(temp_dir) / f"{clip_data['clip_id']}.mp4"
                 
                 loop = asyncio.get_event_loop()
+                video_path = recipe.video_uri.replace("file://", "")
                 await loop.run_in_executor(
                     executor,
                     FFmpegRenderer.render_clip,
-                    request.video_uri,
+                    video_path,
                     str(output_path),
                     clip_data['start_sec'],
                     clip_data['end_sec'],
-                    clip_data['crop_path'],
-                    clip_data['subtitles'],
+                    clip_data.get('crop_paths', []), # Use crop_paths from recipe
+                    clip_data.get('words', []),      # Use words from recipe
                     temp_dir
                 )
                 
-                # Temporary result (will be moved by OutputManager)
+                # Temporary result
                 rendered_clips.append({
                     "clip_id": clip_data['clip_id'],
                     "mp4_url": f"file://{output_path}",
@@ -138,7 +146,7 @@ async def process_render_job(job_id: str, request: RenderRequest):
             output_mgr = OutputManager()
             saved_results = output_mgr.save_job_results(
                 job_id=job_id,
-                video_url=request.video_uri,
+                video_url=recipe.video_uri,
                 clips=rendered_clips,
                 metadata={
                     "total_clips": len(rendered_clips),
@@ -155,6 +163,8 @@ async def process_render_job(job_id: str, request: RenderRequest):
         job["progress"] = 1.0
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         job["status"] = "failed"
         job["error"] = str(e)
 

@@ -82,8 +82,8 @@ class ClipSelectionResponse(BaseModel):
 class RepairRequest(BaseModel):
     raw_edl_json: str
     validation_error: str
-    duration_seconds: float
-    strategy: str
+    duration_sec: float
+    repair_strategy: str
     job_id: str
 
 class RepairResponse(BaseModel):
@@ -291,8 +291,8 @@ async def select_clips(request: ClipSelectionRequest):
         provider = get_provider(request.strategy)
         
         # Extract text from transcript
-        full_text = "\n".join(
-            segment["text"]
+        full_text = " ".join(
+            segment.get("text", "")
             for segment in request.transcript.get("segments", [])
         )
         
@@ -321,7 +321,7 @@ async def repair_edl(request: RepairRequest):
     logger = StructuredLogger(request.job_id, "repair_edl")
     
     try:
-        provider = get_provider(request.strategy)
+        provider = get_provider(request.repair_strategy)
         
         # Build repair instructions
         repair_prompt = f"""The following EDL JSON has validation errors:
@@ -336,11 +336,11 @@ Rules for repair:
 2. Do NOT invent or change timestamps
 3. Remove clips that violate constraints (too short, too long, overlapping)
 4. Keep all valid clips unchanged
-5. Ensure all timestamps are within 0-{request.duration_seconds} seconds
+5. Ensure all timestamps are within 0-{request.duration_sec} seconds
 6. Return ONLY valid JSON matching the EDL schema
 """
         
-        repaired_edl = provider.repair_edl(repair_prompt, request.duration_seconds)
+        repaired_edl = provider.repair_edl(repair_prompt, request.duration_sec)
         
         logger.info("EDL repaired successfully")
         
