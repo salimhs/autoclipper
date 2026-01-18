@@ -15,8 +15,8 @@ RUN apt-get update && \
     build-essential gcc g++ \
     git curl ca-certificates \
     ffmpeg \
-    libgl1-mesa-glx libglib2.0-0 \
-    libsm6 libxext6 libxrender-dev \
+    libgl1 libglib2.0-0 \
+    libsm6 libxext6 libxrender1 \
     pkg-config libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -34,8 +34,10 @@ RUN python -m pip install --upgrade pip wheel setuptools
 # Install runtime deps first (faster, cached layer)
 RUN pip install --no-cache-dir -r requirements-runtime.txt
 
-# Install worker deps (heavier, takes longer)
+# Install CPU-only PyTorch first (required by whisperx)
 RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install worker deps (heavier, takes longer)
 RUN pip install --no-cache-dir -r requirements-worker.txt
 
 # Copy application code
