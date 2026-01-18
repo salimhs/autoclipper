@@ -339,14 +339,20 @@ async def download_video(request: DownloadRequest):
     temp_dir = tempfile.mkdtemp(prefix=f"autoclipper_{request.job_id}_")
     
     try:
-        # Download with yt-dlp
+        # Download with yt-dlp - use more flexible format selection
         video_path = f"{temp_dir}/video.mp4"
-        subprocess.run([
+        result = subprocess.run([
             'yt-dlp',
-            '-f', 'best[ext=mp4]',
+            '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            '--merge-output-format', 'mp4',
             '-o', video_path,
+            '--no-playlist',
             request.video_url
-        ], check=True, capture_output=True)
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error("yt-dlp failed", stderr=result.stderr, stdout=result.stdout)
+            raise Exception(f"yt-dlp failed: {result.stderr or result.stdout}")
         
         # Extract audio with ffmpeg
         audio_path = f"{temp_dir}/audio.wav"
