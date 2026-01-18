@@ -8,15 +8,15 @@ from typing import Dict, Any
 
 
 class WhisperXRunner:
-    def __init__(self, device: str = "cuda", compute_type: str = "float16"):
+    def __init__(self, device: str = "cpu", compute_type: str = "int8"):
         self.device = device
         self.compute_type = compute_type
         self.model = None
         self.align_model = None
         self.metadata = None
     
-    def load_model(self, model_name: str = "large-v2"):
-        """Load WhisperX model."""
+    def load_model(self, model_name: str = "base"):
+        """Load WhisperX model. Using 'base' for CPU efficiency."""
         import whisperx
         self.model = whisperx.load_model(
             model_name,

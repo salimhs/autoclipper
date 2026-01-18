@@ -1,4 +1,4 @@
-# Full ML deployment Dockerfile
+# Full ML deployment Dockerfile - Optimized for Railway Hobby (8GB RAM)
 FROM python:3.11-slim
 
 ENV PIP_DEFAULT_TIMEOUT=300 \
@@ -28,13 +28,21 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
 COPY requirements-runtime.txt requirements-runtime.txt
 COPY requirements-worker.txt requirements-worker.txt
 
-# Install Python dependencies
-RUN python -m pip install --upgrade pip wheel setuptools && \
-    pip install --no-cache-dir -r requirements-runtime.txt && \
-    pip install --no-cache-dir -r requirements-worker.txt
+# Install Python dependencies - split for better caching
+RUN python -m pip install --upgrade pip wheel setuptools
+
+# Install runtime deps first (faster, cached layer)
+RUN pip install --no-cache-dir -r requirements-runtime.txt
+
+# Install worker deps (heavier, takes longer)
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r requirements-worker.txt
 
 # Copy application code
 COPY . /app
+
+# Add perception __init__.py if missing
+RUN touch /app/perception/__init__.py
 
 ENV PYTHONPATH=/app
 USER appuser
