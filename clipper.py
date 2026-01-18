@@ -126,12 +126,13 @@ def process_video(url: str, output_mgr: OutputManager):
     print("NOTE: This requires the API server to be running.")
     print("Start it with: python api/job_controller.py\n")
     
-    import requests
+    # Determine backend URL (local or cloud)
+    backend_url = os.environ.get("CLI_BACKEND_URL", "http://localhost:8081")
     
     try:
         # Submit job
         response = requests.post(
-            "http://localhost:8081/jobs",
+            f"{backend_url.rstrip('/')}/jobs",
             json={"video_url": url},
             timeout=10
         )
