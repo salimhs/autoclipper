@@ -9,8 +9,8 @@ WORKDIR /app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      build-essential gcc git curl ca-certificates \
-      ffmpeg libgl1 libglib2.0-0 pkg-config libffi-dev && \
+    build-essential gcc git curl ca-certificates \
+    ffmpeg libgl1 libglib2.0-0 pkg-config libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements-runtime.txt requirements-runtime.txt
@@ -35,4 +35,4 @@ RUN python -m pip install --upgrade pip && \
 ENV PYTHONPATH=/app
 USER appuser
 EXPOSE 8081
-CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8081}
+CMD ["/bin/sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8081}"]
