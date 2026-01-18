@@ -14,7 +14,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements-runtime.txt requirements-runtime.txt
-COPY requirements-worker.txt requirements-worker.txt
+COPY requirements-worker.txt requirements-worker.txtS
 
 RUN python -m pip install --upgrade pip wheel setuptools && \
     pip wheel --wheel-dir=/wheels -r requirements-runtime.txt --no-cache-dir --prefer-binary && \
