@@ -30,5 +30,5 @@ ENV PYTHONPATH=/app
 # Expose the port (Railway uses PORT environment variable)
 EXPOSE 8081
 
-# Command to run the Job Controller using the shell to expand $PORT
-CMD uvicorn api.job_controller:app --host 0.0.0.0 --port ${PORT:-8081}
+# Command to run the Gumloop Gateway API using the shell to expand $PORT
+CMD uvicorn api.gumloop_gateway:app --host 0.0.0.0 --port ${PORT:-8081}
